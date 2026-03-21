@@ -9,6 +9,8 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import json
 import pandas as pd
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 MODEL_FILE = "model.keras"
 company_tickers = {
@@ -20,8 +22,8 @@ company_tickers = {
 target_company = "Meta"
 
 start_date=datetime(2025,1,8)
-end_date=datetime(2026,1,7)
-#end_date=datetime(2025,1,15)
+#end_date=datetime(2026,1,7)
+end_date=datetime(2025,12,30)
 
 def save_stock_data():
     for name in company_tickers.keys():
@@ -34,22 +36,48 @@ def load_stock_data(company):
         data = pd.read_json(f)
     return data
 
-def import_news_json():
-    pass
-# for each json file in test stock (Meta), turn it into a dataframe row, sort by date
-# for each week, select dataframe rows from that date in order
-# assign each sentiment to the corresponding column, up to 5
-#import the 7 day stock data for the period prior to start
-# on each loop, import the current week of stock prices as the training output
-#ith row of x is input values, ith row of Y is output stock values
-# reassign current week of stock prices as old prices and make them inputs
-
-#functions: get 7 days of stock price starting on (date)
-
-# want final data to have 7 input values for historical stock price, 5 for news sentiment scores, 7 outputs for next 7 days
+def import_news_json(company):
+    with open("sentiment_condensed.json", encoding="utf-8") as f:
+        data = pd.read_json(f)
+        filtered = data[data["company"] == company]
+    return filtered
 
 def generate_xy(stock):
-    stock_data = load_stock_data(target_company)
+    X = pd.DataFrame()
+    Y = pd.DataFrame()
+    articles = 5
+    stock_data = load_stock_data(stock)
+    colname = f"('Close', '{company_tickers[stock]}')"
+    news_sentiment = import_news_json(stock)
+    news_sentiment["date"] = pd.to_datetime(news_sentiment["date"], format="%Y%m%d")
+    week_starting = start_date
+    while week_starting < (end_date-timedelta(days=7)):
+        stock_prices = stock_data.loc[week_starting:week_starting + timedelta(days=7)]
+        sentiments = news_sentiment[(news_sentiment["date"] >= week_starting) & (news_sentiment["date"] < week_starting + timedelta(days=7))]
+
+        # select 5 days of stock prices for features
+        this_week_stocks = stock_prices.iloc[:5][colname].values  # shape (5,)
+
+        # select up to 15 sentiment values within the week
+        sentiments_window = sentiments["combined_sentiment"].values[:articles]  # shape (<=15,)
+
+        # if fewer than 15 sentiments, pad with zeros
+        if len(sentiments_window) < articles:
+            sentiments_window = np.pad(sentiments_window, (0, articles - len(sentiments_window)))
+
+        # combine features: 5 stock prices + 15 sentiments -> shape (20,)
+        features = np.concatenate([this_week_stocks, sentiments_window])
+
+        # append to X and Y
+        X = pd.concat([X, pd.DataFrame([features])], ignore_index=True)
+
+        stock_prices_nxt_week = stock_data.loc[week_starting+timedelta(days=7):week_starting + timedelta(days=14)]
+        next_week =  stock_prices_nxt_week.iloc[:5][colname].values  # shape (5,)
+        Y = pd.concat([Y, pd.DataFrame([next_week])], ignore_index=True)
+
+        # move to next week
+        week_starting += timedelta(days=7)
+    return X, Y
 
 # ----------------------------
 # Deterministic reproducibility
@@ -64,11 +92,13 @@ def set_seed(seed=42):
 # ----------------------------
 # Model definition
 # ----------------------------
+# Model input is [stock price_1 ... stock price_5, news_sentiment_1, .... news_sentiment_5]
+# output is [stock price_6 ... stock price_10]
 def build_model():
     model = keras.Sequential([
-        layers.Input(shape=(4,)),
+        layers.Input(shape=(10,)),
         layers.Dense(16, activation="relu"),
-        layers.Dense(7)
+        layers.Dense(5)
     ])
 
     model.compile(
@@ -83,20 +113,43 @@ def build_model():
 # ----------------------------
 # Training
 # ----------------------------
-def train_model(seed=42):
+
+def train_model(seed=42, test_size=0.2):
     set_seed(seed)
 
     model = build_model()
-    #preprocesses
 
-    # Example synthetic dataset
-    X = np.random.rand(1000, 4)
-    Y = np.random.rand(1000, 7)
+    X, Y = generate_xy(target_company)
 
-    model.fit(X, Y, epochs=20, batch_size=32)
+    # Split into train and evaluation sets
+    X_train, X_eval, Y_train, Y_eval = train_test_split(
+        X, Y, test_size=test_size, random_state=seed, shuffle=True
+    )
+
+    # Train on training set, validate on evaluation set
+    history = model.fit(
+        X_train, Y_train,
+        validation_data=(X_eval, Y_eval),
+        epochs=20,
+        batch_size=32
+    )
 
     model.save(MODEL_FILE)
     print(f"Model saved to {MODEL_FILE}")
+
+    # Show validation results
+    print("Validation results per epoch:")
+    for epoch, val_loss in enumerate(history.history['val_loss'], start=1):
+        print(f"Epoch {epoch}: val_loss = {val_loss:.4f}")
+
+    # Optionally, plot training vs validation loss
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'Training vs Validation Loss for {target_company}')
+    plt.legend()
+    plt.show()
 
 
 # ----------------------------
@@ -150,6 +203,4 @@ def main():
 
 
 if __name__ == "__main__":
-    pass
-   # main()
-   #load_stock_data()
+    main()
