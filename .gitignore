@@ -254,3 +254,5 @@ cmake-build-*/
 # Mongo Explorer plugin
 .idea/**/mongoSettings.xml
 
+scraped_news/*
+scraped_news_sentiment/*

@@ -3,4 +3,11 @@ name = "stock-neural-net"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "newspaper4k==0.9.5",
+    "numpy>=2.4.3",
+    "tensorflow>=2.21.0",
+    "torch==2.10.0",
+    "transformers>=5.3.0",
+    "yfinance>=1.2.0",
+]
