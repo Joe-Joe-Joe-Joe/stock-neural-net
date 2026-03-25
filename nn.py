@@ -45,6 +45,7 @@ def import_news_json(company):
 def generate_xy(stock):
     X = pd.DataFrame()
     Y = pd.DataFrame()
+    # determines number of sentiments to pull in with stock data
     articles = 5
     stock_data = load_stock_data(stock)
     colname = f"('Close', '{company_tickers[stock]}')"
@@ -58,18 +59,19 @@ def generate_xy(stock):
         # select 5 days of stock prices for features
         this_week_stocks = stock_prices.iloc[:5][colname].values  # shape (5,)
 
-        # select up to 15 sentiment values within the week
-        sentiments_window = sentiments["combined_sentiment"].values[:articles]  # shape (<=15,)
+        # select up to 5 sentiment values within the week
+        sentiments_window = sentiments["combined_sentiment"].values[:articles]  # shape (<=5,)
 
-        # if fewer than 15 sentiments, pad with zeros
+        # if fewer than 5 sentiments, pad with zeros
         if len(sentiments_window) < articles:
             sentiments_window = np.pad(sentiments_window, (0, articles - len(sentiments_window)))
 
-        # combine features: 5 stock prices + 15 sentiments -> shape (20,)
+        # combine features: 5 stock prices + 5 sentiments -> shape (10,)
         features = np.concatenate([this_week_stocks, sentiments_window])
 
         # append to X and Y
         X = pd.concat([X, pd.DataFrame([features])], ignore_index=True)
+
 
         stock_prices_nxt_week = stock_data.loc[week_starting+timedelta(days=7):week_starting + timedelta(days=14)]
         next_week =  stock_prices_nxt_week.iloc[:5][colname].values  # shape (5,)
