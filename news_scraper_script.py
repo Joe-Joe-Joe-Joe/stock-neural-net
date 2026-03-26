@@ -4,18 +4,20 @@ from newspaper.google_news import GoogleNewsSource
 from datetime import datetime, timedelta
 import json
 
-company_names=["Tesla","McDonald's","Meta"]
+# company_names=["Tesla","McDonald's","Meta"]
+
+company_names=["McDonald's"]
 site_names=["cnn.com", "bbc.com", "aljazeera.com", "cbc.ca", "theguardian.com"]
 desired_keys=["url", "title", "text", "authors", "publish_date", "meta_site_name"]
 
-end_date=datetime(2025,1,8)
-while end_date<datetime(2026,1,7):
-    start_date=end_date-timedelta(days=7)
+end_date=datetime(2026,1,31)
+while end_date<datetime(2026,2,2):
+    start_date=datetime(2026,1,25)
     source = GoogleNewsSource(
         language='en',
         country='US',
-        start_date=start_date,
-        end_date=end_date,
+        start_date=datetime(2026,1,25),
+        end_date=datetime(2026,1,31),
         max_results=1,
         number_threads=5
     )
