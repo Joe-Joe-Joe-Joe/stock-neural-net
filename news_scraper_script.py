@@ -1,23 +1,45 @@
 import logging
-logging.getLogger('newspaper').setLevel(logging.WARNING)
+logging.getLogger('newspaper').setLevel(logging.ERROR)
 from newspaper.google_news import GoogleNewsSource
+from newspaper import ArticleException
+from newspaper.article import ArticleDownloadState
 from datetime import datetime, timedelta
 import json
 
-# company_names=["Tesla","McDonald's","Meta"]
+OUTPUT_DIR = 'scraped_news'
 
-company_names=["McDonald's"]
-site_names=["cnn.com", "bbc.com", "aljazeera.com", "cbc.ca", "theguardian.com"]
-desired_keys=["url", "title", "text", "authors", "publish_date", "meta_site_name"]
+# company_names=["Tesla",
+#                "McDonald's",
+#                "Meta"]
 
-end_date=datetime(2026,1,31)
-while end_date<datetime(2026,2,2):
-    start_date=datetime(2026,1,25)
+company_names=["Tesla"]
+
+# organized in order of left to center to right leaning news sources
+# according to https://www.allsides.com/media-bias/media-bias-chart as of 2024-06-01
+site_names=["theguardian.com",
+            "cnn.com", 
+            "bbc.com", 
+            "npr.org",
+            "marketwatch.com",
+            "foxbusiness.com",
+            "nypost.com",
+            "aljazeera.com", 
+            "cbc.ca"]
+desired_keys=["url", 
+              "title", 
+              "text", 
+              "authors", 
+              "publish_date", 
+              "meta_site_name"]
+
+start_date = datetime(2026,1,1)
+end_date = datetime(2026,1,7)
+while start_date<end_date:
     source = GoogleNewsSource(
         language='en',
         country='US',
-        start_date=datetime(2026,1,25),
-        end_date=datetime(2026,1,31),
+        start_date=start_date,
+        end_date=start_date+timedelta(days=6),
         max_results=1,
         number_threads=5
     )
@@ -29,6 +51,9 @@ while end_date<datetime(2026,2,2):
             source.build(top_news=False,keyword=company_name+" site:"+site_name)
             try:
                 source.articles[0].download()
+                if source.articles[0].download_state != ArticleDownloadState.SUCCESS:
+                    print(f"Error downloading from {site_name}, skipping article...")
+                    continue
                 source.articles[0].parse()
                 article_data = source.articles[0].to_json(as_string=False)
                 keys_copy = list(article_data.keys())
@@ -37,13 +62,16 @@ while end_date<datetime(2026,2,2):
                         del article_data[key]
                 article_data["company"] = company_name
                 storage[start_date.strftime("%Y_%m_%d")].append(article_data)
+            except ArticleException as e:
+                print(f"Article error from {site_name}: {e}")
             except Exception as e:
                 print(f"Error processing article from {site_name}: {e}")
                 broken_flag=True
                 break
 
         if not broken_flag:
-            with open('scraped_news/news_'+company_name+"_"+start_date.strftime("%Y_%m_%d")+'.json', 'w') as f:
+            with open(f'{OUTPUT_DIR}/news_{company_name}_{start_date.strftime("%Y_%m_%d")}.json', 'w') as f:
                 json.dump(storage, f, indent=4)
+                print(f"Exported data for {company_name} on {start_date.strftime('%Y_%m_%d')}")
 
-    end_date+=timedelta(days=7)
+    start_date+=timedelta(days=7)
