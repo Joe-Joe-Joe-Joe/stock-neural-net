@@ -3,46 +3,54 @@ import json
 import os
 import datetime as dt
 import re
+from copy import deepcopy
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 NEWS_SENTIMENT_DIR = os.path.join(SCRIPT_DIR, "scraped_news_sentiment\\")
 STOCK_DIR = os.path.join(SCRIPT_DIR, "stock_data\\")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "stacked_data\\")
-COMPANIES = ["Tesla", "McDonald's", "Meta"]
+COMPANY_NAME = ["Tesla", "McDonald's", "Meta"]
+# NAICS code from https://www.naics.com/search/ and inputting company's name
+COMPANY_TYPE = [[33,6,1,1,0], [72,2,5,1,3], [51,9,2,9,0]]
+# location of company's corporate HQ
+COMPANY_STATE = ["TX", "IL", "CA"]
+# company networth, according to https://companiesmarketcap.com
+COMPANY_MARKETCAP = [1396000000000, 220450000000, 1385000000000]
 WINDOW_SIZE = 4
+EMPTY_DATE = dt.datetime(1900,1,1)
 
 target_company = 2
 start_date = dt.datetime(2025, 1, 4)
 end_date = dt.datetime(2025, 1, 31)
 
-# class stock_data:
-#         def __init__(self, date: str, close: float = 0, high: float = 0, low: float = 0, volume: int = 0):
-#             self.date = date
-#             self.close = close
-#             self.high = high
-#             self.low = low
-#             self.volume = volume
-
-# class date_data:
-#     def __init__(self, date: dt.datetime, combined_sentiment: float = 5.0, stock_price: stock_data = None):
-#         self.date = date
-#         self.combined_sentiment = combined_sentiment
-#         self.stock_data = stock_price
+# uncomment once working with data that is aligned with sunday/saturday frame
+# assert start_date.weekday() == 6, "Start date is not a Sunday!"
+# assert start_date.weekday() == 5, "End date is not a Saturday!"
 
 def str_to_date(str:str):
     return dt.datetime.strptime(str[0:str.find("T")], "%Y-%m-%d")
 
-date_data = {"date": dt.datetime(1999,1,1),
+date_data = {"date": EMPTY_DATE,
              "combined_sentiment": 5.0,
              "open": 0.0,
              "close": 0.0,
              "high": 0.0,  
              "low": 0.0,
              "volume": 0.0}
-
-date_data_nostockdata = {"date": dt.datetime(1999,1,1),
-                     "combined_sentiment": 5.0}
-
+week = {"week_id": -1,
+        "week_start_date": EMPTY_DATE,
+        "week_end_date": EMPTY_DATE,
+        "days": []
+        }
+block = {"block_id": -1,
+         "block_start_date": EMPTY_DATE,
+         "block_end_date": EMPTY_DATE,
+         "weeks": []}
+input_data = {"company_name": COMPANY_NAME[target_company],
+              "company_type": COMPANY_TYPE[target_company],
+              "company_state": COMPANY_STATE[target_company],
+              "company_marketcap":COMPANY_MARKETCAP[target_company],
+              "blocks": []}
 
 # initialize date_data_list with all date_data between start_date and end_date
 date_data_list = []
@@ -52,10 +60,11 @@ for day in range((end_date - start_date).days + 1):
     tmp["date"] = date
     date_data_list.append(tmp)
 
+assert len(date_data_list)%7 == 0 and len(date_data_list)//7 >= WINDOW_SIZE, "\"date_data_list\" is wrong size!"
 
 # fill array with sentiment data
 for file in os.listdir(NEWS_SENTIMENT_DIR):
-    if COMPANIES[target_company] not in file:
+    if COMPANY_NAME[target_company] not in file:
         continue
 
     with open(f"{NEWS_SENTIMENT_DIR}/{file}", encoding='utf-8') as f:
@@ -90,7 +99,7 @@ for file in os.listdir(NEWS_SENTIMENT_DIR):
 
 # fill array with stock data
 for file in os.listdir(STOCK_DIR):
-    if COMPANIES[target_company] not in file:
+    if COMPANY_NAME[target_company] not in file:
         continue
 
     with open(f"{STOCK_DIR}/{file}", encoding='utf-8') as f:
@@ -103,8 +112,22 @@ for file in os.listdir(STOCK_DIR):
                 date_data_list[index][stock_infotype] = price
 
 # create blocks
-            
+for block_id in range(len(date_data_list)//7 - WINDOW_SIZE + 1):
+    cur_block = deepcopy(block)
+    cur_block["block_id"] = block_id
+    # TO DO: add start and end dates to block
+    for week_id in range(WINDOW_SIZE):
+        cur_week = deepcopy(week)
+        cur_week["week_id"] = week_id
+        for day_id in range(7):
+            index = day_id + week_id*7 + block_id*WINDOW_SIZE
+            cur_week["days"].append(date_data_list[index])
+        cur_week["week_start_date"] = cur_week["days"][0]["date"]
+        cur_week["week_end_date"] = cur_week["days"][-1]["date"]
+        cur_block["weeks"].append(cur_week)
+    cur_block["block_start_date"] = cur_block["weeks"][0]["days"][0]["date"]
+    cur_block["block_end_date"] = cur_block["weeks"][-1]["days"][-1]["date"]
+    input_data["blocks"].append(cur_block)
 
-df = pd.DataFrame(date_data_list)
-with open(f"{COMPANIES[target_company]}_data.json", "w", encoding="utf-8") as f:
-    df.to_json(f, indent=4, index=False, date_format="iso")
+with open(f"{COMPANY_NAME[target_company]}_data.json", "w", encoding="utf-8") as f:
+    json.dump(input_data, f, indent=4, default=str)
