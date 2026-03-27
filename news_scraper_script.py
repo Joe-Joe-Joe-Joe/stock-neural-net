@@ -8,11 +8,9 @@ import json
 
 OUTPUT_DIR = 'scraped_news'
 
-# company_names=["Tesla",
-#                "McDonald's",
-#                "Meta"]
-
-company_names=["Tesla"]
+company_names=["Tesla",
+               "McDonald's",
+               "Meta"]
 
 # organized in order of left to center to right leaning news sources
 # according to https://www.allsides.com/media-bias/media-bias-chart as of 2024-06-01
@@ -32,8 +30,9 @@ desired_keys=["url",
               "publish_date", 
               "meta_site_name"]
 
-start_date = datetime(2026,1,1)
-end_date = datetime(2026,1,7)
+start_date = datetime(2025,1,4)
+end_date = datetime(2025,1,31)
+
 while start_date<end_date:
     source = GoogleNewsSource(
         language='en',

@@ -257,3 +257,4 @@ cmake-build-*/
 scraped_news/*
 scraped_news_sentiment/*
 stock_data/*
+*.json
