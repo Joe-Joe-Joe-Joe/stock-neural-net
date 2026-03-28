@@ -125,7 +125,9 @@ for file in os.listdir(NEWS_SENTIMENT_DIR):
                 publish_date = dt.datetime.strptime(date, "%Y_%m_%d")
             else:
                 publish_date = str_to_date(article.get("publish_date"))
-            assert publish_date <= end_date and publish_date >= start_date, "Article publish date is out of range"
+            if not (publish_date <= end_date and publish_date >= start_date):
+                print(f"Article publish date is out of range ({publish_date})")
+                continue
 
             index = (publish_date - start_date).days
             cur_sentiment = date_data_list[index]["combined_sentiment"]
