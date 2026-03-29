@@ -6,6 +6,7 @@ import re
 from copy import deepcopy
 import tensorflow as tf
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +33,7 @@ NUM_FEATURES = NUM_COMPANY_FEATURES + NUM_STOCK_FEATURES + NUM_SENTIMENT_FEATURE
 EMPTY_DATE = dt.datetime(1900,1,1)
 EMPTY_SENTIMENT = -1.0
 
-# ensure flags at end of date_data, visualize() relies on flags being at end of dict
+# if day_id/date/flags change order in dict, change visualize() since relies on order of keys
 date_data = {"day_id": -1,
              "date": EMPTY_DATE,
              "open": 0.0,
@@ -104,22 +105,40 @@ def unpack_to_tensor(data:dict):
  
     return tf.convert_to_tensor(input_tensor)
 
-def visualize_data(date_data_list:list):
+def visualize_data(date_data_list:list, fig_w:float = 16, fig_h:float = 9, outlook:int = 0):
     '''
     Takes in date_data_list and creates an array of I/O plots across all features.
     '''
-    num_rows = NUM_FEATURES-NUM_FLAGS
-    num_cols = NUM_FEATURES-NUM_FLAGS
+    num_rows = NUM_STOCK_FEATURES + NUM_SENTIMENT_FEATURES
+    num_cols = num_rows
+    
+    fig, axs = plt.subplots(num_rows,num_cols, figsize=(fig_w, fig_h))
 
-    fig, axs = plt.subplots(3,3, figsize=(10, 10))
-
-    X, Y = np.meshgrid(np.linspace(-3, 3, 128), np.linspace(-3, 3, 128))
-    Z = (1 - X/2 + X**5 + Y**3) * np.exp(-X**2 - Y**2)
-
-    for i in range(num_rows):
-        for j in range(num_cols):
-            pc = axs[i,j].scatter(X,Y,c=Z, cmap='plasma')
-
+    keys = list(date_data.keys())
+    
+    for col in range(num_cols):
+        for row in range(num_rows):
+            X = []
+            Y = []
+            Z = []
+            for index, cur_date_data in enumerate(date_data_list):
+                # ensures data is not missing before plotting
+                if index+outlook > len(date_data_list)-1:
+                    continue
+                outlook_date_data = date_data_list[index+outlook]
+                if not ((cur_date_data["nosentimentdata_flag"]==1.0 and (col+2 == 7 or row+2 == 7))
+                        or (cur_date_data["nostockdata_flag"]==1.0 and (col+2 in range(2, 7) or row+2 in range(2,7)))
+                        or (outlook_date_data["nosentimentdata_flag"]==1.0 and (col+2 == 7 or row+2 == 7))
+                        or (outlook_date_data["nostockdata_flag"]==1.0 and (col+2 in range(2, 7) or row+2 in range(2,7)))):
+                    np_datetime = np.datetime64(cur_date_data[keys[1]])
+                    X.append(cur_date_data[keys[col+2]])
+                    Y.append(outlook_date_data[keys[row+2]])
+                    np_datetime = np.datetime64(cur_date_data[keys[1]])
+                    Z.append(np_datetime)
+            axs[row,col].scatter(X,Y, c=Z, cmap='plasma')
+            if col == 0: axs[row,col].set_ylabel(keys[row+2])
+            if row == num_rows-1: axs[row,col].set_xlabel(keys[col+2])
+    plt.suptitle(f"outlook = {outlook} days")
     plt.show()
     
 
@@ -225,16 +244,18 @@ if __name__ == "__main__":
     start_date = dt.datetime(2025, 1, 4)        # start date is inclusive
     end_date = dt.datetime(2025, 1, 31)         # end date is inclusive
 
-    try:
-        with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
-            json_data = json.load(f)
-            input_tensor = unpack_to_tensor(json_data)
-    except FileNotFoundError:
-        date_data_list = create_date_data_list(start_date, end_date, target_company)
-        pack(date_data_list, target_company)
-        with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
-            json_data = json.load(f)
-            input_tensor = unpack_to_tensor(json_data)
+    # try:
+    #     with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
+    #         json_data = json.load(f)
+    #         input_tensor = unpack_to_tensor(json_data)
+    # except FileNotFoundError:
+    #     date_data_list = create_date_data_list(start_date, end_date, target_company)
+    #     pack(date_data_list, target_company)
+    #     with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
+    #         json_data = json.load(f)
+    #         input_tensor = unpack_to_tensor(json_data)
+    # print(input_tensor[0,0,NUM_FEATURES-2])
+    # print(input_tensor[0,0,NUM_FEATURES-1])
 
-    print(input_tensor[0,0,NUM_FEATURES-2])
-    print(input_tensor[0,0,NUM_FEATURES-1])
+    date_data_list = create_date_data_list(start_date, end_date, target_company)
+    visualize_data(date_data_list, outlook=7)
