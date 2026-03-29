@@ -105,7 +105,11 @@ def unpack_to_tensor(data:dict):
  
     return tf.convert_to_tensor(input_tensor)
 
-def visualize_data(date_data_list:list, fig_w:float = 16, fig_h:float = 9, outlook:int = 0):
+def visualize_data(date_data_list:list,
+                   company_name:str = "", 
+                   fig_w:float = 16, 
+                   fig_h:float = 9, 
+                   outlook:int = 0):
     '''
     Takes in date_data_list and creates an array of I/O plots across all features.
     '''
@@ -133,16 +137,16 @@ def visualize_data(date_data_list:list, fig_w:float = 16, fig_h:float = 9, outlo
                     np_datetime = np.datetime64(cur_date_data[keys[1]])
                     X.append(cur_date_data[keys[col+2]])
                     Y.append(outlook_date_data[keys[row+2]])
-                    np_datetime = np.datetime64(cur_date_data[keys[1]])
+                    np_datetime = np.datetime64(outlook_date_data[keys[1]])
                     Z.append(np_datetime)
             axs[row,col].scatter(X,Y, c=Z, cmap='plasma')
             if col == 0: axs[row,col].set_ylabel(keys[row+2])
+            else: axs[row,col].yaxis.set_ticklabels([])
             if row == num_rows-1: axs[row,col].set_xlabel(keys[col+2])
-    plt.suptitle(f"outlook = {outlook} days")
+            else: axs[row,col].xaxis.set_ticklabels([])
+    plt.suptitle(f"{company_name}: outlook = {outlook} days")
     plt.show()
     
-
-
 def create_date_data_list(start_date:dt.datetime, end_date:dt.datetime, target_company:int):
     f'''
     Creates a date_data_list that includes all data for the target company between the start and end date provided (inclusive).\n
@@ -150,7 +154,7 @@ def create_date_data_list(start_date:dt.datetime, end_date:dt.datetime, target_c
     '''
     # initialize date_data_list with all date_data between start_date and end_date
     date_data_list = []
-    for day in range((end_date - start_date).days + 2):
+    for day in range((end_date - start_date).days + 1):
         date = (start_date + dt.timedelta(days=day))
         tmp = date_data.copy()
         tmp["date"] = date
@@ -241,21 +245,25 @@ def pack(date_data_list:list, target_company:int):
 
 if __name__ == "__main__":
     target_company = 2
-    start_date = dt.datetime(2025, 1, 4)        # start date is inclusive
-    end_date = dt.datetime(2025, 1, 31)         # end date is inclusive
+    start_date = dt.datetime(2025, 1, 1)         # start date is inclusive
+    end_date = dt.datetime(2025, 12, 31)         # end date is inclusive
+    visualize = False
 
-    # try:
-    #     with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
-    #         json_data = json.load(f)
-    #         input_tensor = unpack_to_tensor(json_data)
-    # except FileNotFoundError:
-    #     date_data_list = create_date_data_list(start_date, end_date, target_company)
-    #     pack(date_data_list, target_company)
-    #     with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
-    #         json_data = json.load(f)
-    #         input_tensor = unpack_to_tensor(json_data)
-    # print(input_tensor[0,0,NUM_FEATURES-2])
-    # print(input_tensor[0,0,NUM_FEATURES-1])
+    try:
+        with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
+            json_data = json.load(f)
+            input_tensor = unpack_to_tensor(json_data)
+    except FileNotFoundError:
+        date_data_list = create_date_data_list(start_date, end_date, target_company)
+        pack(date_data_list, target_company)
+        with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
+            json_data = json.load(f)
+            input_tensor = unpack_to_tensor(json_data)
 
-    date_data_list = create_date_data_list(start_date, end_date, target_company)
-    visualize_data(date_data_list, outlook=7)
+    if visualize:
+        try:
+            date_data_list
+        except NameError:
+            date_data_list = create_date_data_list(start_date, end_date, target_company)
+        visualize_data(date_data_list, company_name=COMPANY_NAME[target_company], outlook=0)
+        visualize_data(date_data_list, company_name=COMPANY_NAME[target_company], outlook=7)
