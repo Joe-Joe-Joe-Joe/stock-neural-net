@@ -7,8 +7,8 @@ company_tickers = {
     "Meta": 'META'
 }
 
-start_date = datetime.datetime(2025,1,4)
-end_date = datetime.datetime(2025,1,31)
+start_date = datetime.datetime(2025,1,1)
+end_date = datetime.datetime(2025,12,31)
 
 for name in company_tickers.keys():
     stock_data = yf.download(company_tickers[name], start_date, end_date)

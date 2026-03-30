@@ -258,4 +258,6 @@ scraped_news/*
 scraped_news_sentiment/*
 stock_data/*
 *.json
-scratch.py
+scratch*.py
+MicrosoftStock.csv
+raw.csv

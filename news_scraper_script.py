@@ -30,8 +30,8 @@ desired_keys=["url",
               "publish_date", 
               "meta_site_name"]
 
-start_date = datetime(2025,1,4)
-end_date = datetime(2025,1,31)
+start_date = datetime(2025,5,28)
+end_date = datetime(2025,12,31)
 
 while start_date<end_date:
     source = GoogleNewsSource(

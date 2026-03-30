@@ -84,6 +84,7 @@ def unpack_to_tensor(data:dict):
     assert data["blocks"][0]["days"][0].keys() == date_data.keys(), "Key mismatch in JSON day data!"
 
     input_tensor = np.empty([len(data["blocks"]), len(data["blocks"][0]["days"]), NUM_FEATURES])
+    mask = np.empty(input_tensor.shape[0] * input_tensor.shape[1])
 
     company_data = []
     for i in range(COMPANY_TYPE_LEN): company_data.append(data["company_type"][i])
@@ -97,13 +98,13 @@ def unpack_to_tensor(data:dict):
                              data["blocks"][block_id]["days"][day_id]["high"],
                              data["blocks"][block_id]["days"][day_id]["low"],
                              data["blocks"][block_id]["days"][day_id]["volume"],
-                             data["blocks"][block_id]["days"][day_id]["combined_sentiment"],
-                             data["blocks"][block_id]["days"][day_id]["nostockdata_flag"],
-                             data["blocks"][block_id]["days"][day_id]["nosentimentdata_flag"]]
+                             data["blocks"][block_id]["days"][day_id]["combined_sentiment"]]
             for i in range(len(company_data)): input_tensor[block_id, day_id, i] = company_data[i]
             for i in range(len(curr_day_data)): input_tensor[block_id, day_id, i+len(company_data)] = curr_day_data[i]
+            mask[block_id*WINDOW_SIZE + day_id-1] = bool(data["blocks"][block_id]["days"][day_id]["nostockdata_flag"] 
+                                                       or data["blocks"][block_id]["days"][day_id]["nosentimentdata_flag"])
  
-    return tf.convert_to_tensor(input_tensor)
+    return tf.convert_to_tensor(input_tensor), tf.convert_to_tensor(mask)
 
 def visualize_data(date_data_list:list,
                    company_name:str = "", 
@@ -252,13 +253,13 @@ if __name__ == "__main__":
     try:
         with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
             json_data = json.load(f)
-            input_tensor = unpack_to_tensor(json_data)
+            input_tensor, mask = unpack_to_tensor(json_data)
     except FileNotFoundError:
         date_data_list = create_date_data_list(start_date, end_date, target_company)
         pack(date_data_list, target_company)
         with open(f"{COMPANY_NAME[target_company]}_data.json",'r') as f:
             json_data = json.load(f)
-            input_tensor = unpack_to_tensor(json_data)
+            input_tensor, mask = unpack_to_tensor(json_data)
 
     if visualize:
         try:
